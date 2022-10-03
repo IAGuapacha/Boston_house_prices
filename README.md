@@ -1,7 +1,7 @@
 boston house prices
 ==============================
 
-A short description of the project.
+Initial data science project, the entire data preparation and cleaning process is carried out in order to find a base model that fits the data and the output variable. 
 
 Project Organization
 ------------
