@@ -87,3 +87,9 @@ target/
 
 # Mypy cache
 .mypy_cache/
+
+# exclude report from source control
+/reports/
+
+# exclude models from source control
+/models/
