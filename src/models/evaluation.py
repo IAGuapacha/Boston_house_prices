@@ -1,7 +1,8 @@
 import pandas as pd
 import logging
 from joblib import load
-from sklearn.metrics import recall_score
+from sklearn.metrics import r2_score
+from dotenv import find_dotenv, load_dotenv
 from pathlib import Path
 import numpy as np
 
@@ -11,10 +12,8 @@ import os
 sys.path.append(os.path.abspath('src/'))
 
 
-from features.build_features import (print_shape, replace_missing_values,
-    filter_cols_values, fill_na_with_col, fill_na_with_string, encoding_columns,
-    medication_changes, medication_encoding, diagnose_encoding, to_categorical,
-    drop_cols, encode_categorical, process_medical_specialty)
+from features.build_features import (print_shape, drop_outliers, reset_index, fill_nan,drop_nan)
+
 
 def main(input_filepath, output_filepath, input_test_filepath, report_filepath):
     """ Runs model training scripts to turn processed data from (../processed) into
@@ -23,14 +22,14 @@ def main(input_filepath, output_filepath, input_test_filepath, report_filepath):
     logger = logging.getLogger(__name__)
     logger.info('evaluating ML model')
 
-    model = load(f'{output_filepath}/NB_final_model.joblib')
+    model = load(f'{output_filepath}/SVR_final_model.joblib')
     
     x_train = pd.read_csv(f"{input_filepath}/x_train_model_input.csv")
     y_train = pd.read_csv(f"{input_filepath}/y_train_model_input.csv")
 
     y_pred = model.predict(x_train)
 
-    train_score = recall_score(y_train, y_pred)
+    train_score = r2_score(y_train, y_pred)
     print(f"Train Score: {train_score}")
 
     with open(f'{report_filepath}/train_score.txt', 'w') as f:
@@ -45,12 +44,12 @@ def main(input_filepath, output_filepath, input_test_filepath, report_filepath):
 
     test_eval = feature_process(test)
 
-    x_test_model = test_eval.drop("readmitted", axis=1)
-    y_test_model = test_eval["readmitted"]
+    x_test_model = test_eval.drop("medv", axis=1)
+    y_test_model = test_eval["medv"]
 
     y_test_pred = model.predict(x_test_model)
 
-    test_score = recall_score(y_test_model, y_test_pred)
+    test_score = r2_score(y_test_model, y_test_pred)
     print(f"Test Score: {test_score}")
 
     with open(f'{report_filepath}/test_score.txt', 'w') as f:
@@ -60,62 +59,41 @@ def main(input_filepath, output_filepath, input_test_filepath, report_filepath):
 
 def feature_process(data: pd.DataFrame) -> pd.DataFrame:
 
-    """Process raw data into useful files for model."""
-    cols_to_drop = ['encounter_id',
-                      'patient_nbr',
-                      'examide',
-                      'citoglipton',
-                      'glimepiride-pioglitazone',
-                      'weight',
-                      'payer_code',
-                      'diag_3',
-                      'gender'
-                      ]
-    medication = ['metformin', 'repaglinide', 'nateglinide', 
-            'chlorpropamide', 'glimepiride', 'glipizide', 
-            'glyburide', 'pioglitazone', 'rosiglitazone', 
-            'acarbose', 'miglitol', 'insulin', 
-            'glyburide-metformin', 'tolazamide', 
-            'metformin-pioglitazone','metformin-rosiglitazone',
-            'glipizide-metformin', 'troglitazone', 'tolbutamide',
-            'acetohexamide']
-
-    med_specialty = ['Unknow', 'InternalMedicine', 'Family/GeneralPractice',
-                     'Cardiology', 'Surgery-General', 'Orthopedics', 'Gastroenterology',
-                     'Nephrology', 'Orthopedics-Reconstructive',
-                     'Surgery-Cardiovascular/Thoracic', 'Pulmonology', 'Psychiatry',
-                     'Emergency/Trauma', 'Surgery-Neuro', 'ObstetricsandGynecology',
-                     'Urology', 'Surgery-Vascular', 'Radiologist']            
-
-    cat_cols = ["admission_type_id", 
-                "discharge_disposition_id",
-                "admission_source_id"]                          
-
+                            
     process_data = (data
-                    .pipe(print_shape, msg=' Shape original')
-                    .pipe(replace_missing_values, replace_values='?')
-                    .pipe(print_shape, msg=' Shape after replace missing values')
-                    .pipe(filter_cols_values, filter_col='discharge_disposition_id',
-                          filter_values=[11, 13, 14, 19, 20])#test
-                    .pipe(print_shape, msg=' Shape after filter discharge_disposition_id')
-                    .pipe(filter_cols_values, filter_col='diag_1', filter_values=[np.nan])#test
-                    .pipe(print_shape, msg=' Shape after filter diag_1')
-                    .pipe(fill_na_with_col, fill_col='diag_2', fill_col_from='diag_3')#test
-                    .pipe(fill_na_with_col, fill_col='diag_2', fill_col_from='diag_1')#test
-                    .pipe(print_shape, msg=' Shape after fill diag_2')
-                    .pipe(fill_na_with_string, fill_col='medical_specialty', fill_string='Unknown')#test
-                    .pipe(print_shape, msg=' Shape after fill na medical specialty with Unknown')#test
-                    .pipe(fill_na_with_string, fill_col='race', fill_string='Caucasian')#test
-                    .pipe(encoding_columns)
-                    .pipe(medication_changes,keys = medication)
-                    .pipe(medication_encoding, keys = medication)
-                    .pipe(diagnose_encoding)
-                    .pipe(process_medical_specialty, keys = med_specialty)
-                    .pipe(to_categorical, categorical_cols = cat_cols)
-                    .pipe(drop_cols, drop_cols = cols_to_drop)
-                    .pipe(print_shape, msg=' Shape after drop cols')
-                    .pipe(encode_categorical)
-                    .pipe(print_shape, msg=' Shape after encode categorical cols')
+                    .pipe(drop_outliers, col ="crim")  
+                    .pipe(print_shape, msg=' Shape after remove outliers from crim')     
+                    .pipe(fill_nan, col= "crim",value= 1.27038)
+                    .pipe(fill_nan, col= "zn",value= 0.0) 
+                    .pipe(drop_nan, col= "indus") 
+                    .pipe(print_shape, msg=' Shape after removing nan values from indus') 
+                    .pipe(fill_nan, col= "chas", value= 0.0) 
+                    .pipe(drop_outliers, col ="nox") 
+                    .pipe(print_shape, msg=' Shape after remove outliers from nox')   
+                    .pipe(drop_nan, col= "nox") 
+                    .pipe(print_shape, msg=' Shape after removing nan values from nox') 
+                    .pipe(drop_outliers, col ="rm") 
+                    .pipe(print_shape, msg=' Shape after remove outliers from rm') 
+                    .pipe(drop_nan, col= "rm") 
+                    .pipe(print_shape, msg=' Shape after removing nan values from rm') 
+                    .pipe(drop_nan, col= "age") 
+                    .pipe(print_shape, msg=' Shape after removing nan values from age') 
+                    .pipe(fill_nan, col= "dis", value= 4.2820) 
+                    .pipe(drop_outliers, col ="dis") 
+                    .pipe(print_shape, msg=' Shape after remove outliers from dis') 
+                    .pipe(fill_nan, col= "rad", value= 4.0)
+                    .pipe(fill_nan, col= "tax", value= 666.0)
+                    .pipe(fill_nan, col= "ptratio", value= 20.2)
+                    .pipe(fill_nan, col= "black", value= 396.9)
+                    .pipe(drop_outliers, col ="black")
+                    .pipe(print_shape, msg=' Shape after remove outliers from black') 
+                    .pipe(fill_nan, col= "lstat", value= 1.73)
+                    .pipe(drop_outliers, col ="lstat")
+                    .pipe(print_shape, msg=' Shape after remove outliers from lstat') 
+                    .pipe(drop_nan, col= "lstat") 
+                    .pipe(print_shape, msg=' Shape after removing nan values from lstat') 
+                    .pipe(drop_nan, col= "medv") 
+                    .pipe(reset_index)
                     )
     return process_data                
 
@@ -129,7 +107,7 @@ if __name__ == '__main__':
 
     # find .env automagically by walking up directories until it's found, then
     # load up the .env entries as environment variables
-    #load_dotenv(find_dotenv())
+    load_dotenv(find_dotenv())
 
     main(f'{project_dir}/data/processed', 
         f'{project_dir}/models',

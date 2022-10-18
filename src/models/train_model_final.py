@@ -19,6 +19,7 @@ def main(input_filepath, output_filepath):
 
     x = pd.read_csv(f"{input_filepath}/x_train_model_input.csv")
     y = pd.read_csv(f"{input_filepath}/y_train_model_input.csv")
+
     print(x.info())
     print(y.info())
 

@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 import pandas as pd
-from src.data.preprocessing import process_data
+from preprocessing import process_data
 from sklearn.model_selection import train_test_split
 
 
